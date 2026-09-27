@@ -1,0 +1,1537 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام إدارة وإحصاء الإنجازات والاشتراكات</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root { --primary: #1a365d; --secondary: #2b6cb0; --bg: #f7fafc; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg); margin: 0; padding: 0; color: #2d3748; position: relative; min-height: 100vh; }
+        
+        /* طبقة خلفية الصورة المخصصة للقطاع */
+        #dynamicBgOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: -1;
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            opacity: 0.15;
+            display: none;
+        }
+
+        header { background: var(--primary); color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; position: relative; z-index: 2; }
+        .header-center-logo { display: flex; align-items: center; gap: 10px; }
+        .header-center-logo img { height: 38px; max-width: 120px; object-fit: contain; border-radius: 4px; background: rgba(255,255,255,0.1); padding: 2px; }
+
+        .nav-btns { display: flex; gap: 8px; }
+        .container { padding: 20px; max-width: 950px; margin: auto; padding-bottom: 80px; position: relative; z-index: 2; }
+        .card { background: rgba(255, 255, 255, 0.95); padding: 25px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 20px; position: relative; }
+        .btn { background: var(--secondary); color: white; border: none; padding: 8px 14px; border-radius: 5px; cursor: pointer; font-size: 14px; }
+        .btn-back { background: #718096; }
+        .btn-danger { background: #e53e3e; }
+        .btn-success { background: #38a169; }
+        .btn-warning { background: #d69e2e; color: white; }
+        .btn-info { background: #319795; color: white; }
+        .btn-print { background: #d69e2e; color: #fff; font-weight: bold; }
+        .btn:disabled { background: #cbd5e0; cursor: not-allowed; }
+        .hidden { display: none !important; }
+        input, select { padding: 10px; width: 100%; margin-bottom: 12px; border: 1px solid #cbd5e0; border-radius: 4px; box-sizing: border-box; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; background: rgba(255,255,255,0.9); }
+        th, td { border: 1px solid #e2e8f0; padding: 10px; text-align: right; }
+        th { background: #edf2f7; }
+        .sector-badge { background: #feebc8; color: #742a2a; padding: 8px 12px; border-radius: 5px; font-weight: bold; display: inline-block; margin-bottom: 15px; }
+        
+        .countdown-banner {
+            background: linear-gradient(135deg, #2b6cb0, #1a365d);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: bold;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .honor-board { background: linear-gradient(135deg, #f6e05e, #d69e2e); color: #742a2a; padding: 20px; border-radius: 8px; text-align: center; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .locked-tag { color: #a0aec0; font-size: 12px; font-weight: bold; }
+        
+        .modal { 
+            position: fixed; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100%; 
+            background: rgba(0,0,0,0.6); 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            z-index: 9999; 
+        }
+        .modal-content { 
+            background: white; 
+            padding: 25px; 
+            border-radius: 8px; 
+            width: 90%; 
+            max-width: 750px; 
+            max-height: 80vh; 
+            overflow-y: auto; 
+            position: relative;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        .close-btn {
+            position: absolute;
+            top: 10px;
+            left: 15px;
+            font-size: 24px;
+            cursor: pointer;
+            color: #a0aec0;
+        }
+        .close-btn:hover { color: #e53e3e; }
+        .filter-box { background: #edf2f7; padding: 15px; border-radius: 6px; margin-bottom: 15px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        
+        footer { 
+            font-size: 15px; 
+            font-weight: bold;
+            color: #1a202c; 
+            text-align: left; 
+            padding: 14px 25px; 
+            position: fixed; 
+            bottom: 0; 
+            left: 0; 
+            width: 100%; 
+            background: #e2e8f0; 
+            direction: ltr; 
+            box-sizing: border-box; 
+            border-top: 2px solid #cbd5e0;
+            z-index: 1000;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        footer a { color: #2b6cb0; text-decoration: none; }
+
+        @media print {
+            header, .nav-btns, .filter-box, .btn, .close-btn, footer, #adminDash > h4, #adminDash > div:not(#printableReportSection) {
+                display: none !important;
+            }
+            body { background: white; color: black; }
+            .container { width: 100%; max-width: 100%; padding: 0; margin: 0; }
+            .card { box-shadow: none; border: none; padding: 0; background: white !important; }
+            .modal { position: static; background: white; display: block; }
+            .modal-content { max-width: 100%; width: 100%; box-shadow: none; border: none; padding: 0; }
+            table { width: 100%; border: 1px solid #000; }
+            th, td { border: 1px solid #000 !important; color: black !important; }
+            .print-header { text-align: center; margin-bottom: 20px; display: block !important; border-bottom: 2px solid #000; padding-bottom: 10px; }
+        }
+        .print-header { display: none; }
+    </style>
+</head>
+<body>
+
+    <!-- طبقة الخلفية الديناميكية للقطاع -->
+    <div id="dynamicBgOverlay"></div>
+
+    <header>
+        <div class="header-center-logo">
+            <div id="headerLogoContainer"></div>
+            <h3 id="appTitleText" style="margin:0;">نظام إدارة وإحصاء الإنجازات</h3>
+        </div>
+        <div class="nav-btns">
+            <button class="btn btn-back" onclick="goBack()">⬅️ رجوع للخلف</button>
+            <button class="btn" onclick="showPage('home')">🏠 الصفحة الرئيسية</button>
+        </div>
+    </header>
+
+    <div class="container">
+
+        <!-- 1. الرئيسية -->
+        <div id="home" class="card">
+            <h2>مرحباً بك في نظام إدارة وتوثيق الإنجازات</h2>
+            <p>اختر الخدمة للبدء أو استعرض دليل الاستخدام:</p>
+            <div style="margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
+                <button class="btn" onclick="showPage('adminLogin')">🔑 دخول المشرف العام</button>
+                <button class="btn" onclick="showPage('limitedAdminLogin')">👤 دخول مشرف محدود الصلاحية</button>
+                <button class="btn" onclick="showPage('empLogin')">👤 دخول الموظف</button>
+                <button class="btn btn-success" onclick="showPage('register')">📝 تسجيل قطاع جديد</button>
+                <button class="btn btn-info" onclick="openGuideModal()">📖 دليل الاستخدام</button>
+            </div>
+        </div>
+
+        <!-- 2. تسجيل قطاع جديد -->
+        <div id="register" class="card hidden">
+            <h3>تسجيل قطاع / إدارة جديدة</h3>
+            <p>أنشئ حساب الإدارة واحصل على كود القطاع الخاص بموظفيك:</p>
+            
+            <p><label>اسم القطاع / الشركة:</label></p>
+            <input type="text" id="regSectorName" placeholder="مثال: شركة التطوير">
+            
+            <p><label>اسم المشرف العام:</label></p>
+            <input type="text" id="regAdminName" placeholder="اسم المشرف المسؤول">
+            
+            <p><label>الشفرة السرية للمشرف:</label></p>
+            <input type="password" id="regAdminPass" placeholder="أدخل كلمة مرور قوية">
+
+            <p><label>البريد الإلكتروني:</label></p>
+            <input type="email" id="regEmail" placeholder="example@domain.com" oninput="validateRegForm()">
+            
+            <p><label>رقم الجوال (يدعم كافة مفاتيح الدول):</label></p>
+            <input type="text" id="regPhone" placeholder="+00 000 000 0000" oninput="validateRegForm()">
+
+            <button class="btn btn-success" id="submitRegBtn" onclick="registerSector()" style="margin-top: 10px;" disabled>تأكيد وإنشاء الحساب</button>
+        </div>
+
+        <!-- 3. دخول المشرف العام -->
+        <div id="adminLogin" class="card hidden">
+            <h3>دخول المشرف العام للقطاع</h3>
+            <input type="text" id="loginAdminSectorCode" placeholder="كود القطاع (مثل: SEC-8492)">
+            <input type="password" id="loginAdminPass" placeholder="الشفرة السرية">
+            <button class="btn" onclick="adminLogin()">دخول لوحة التحكم</button>
+        </div>
+
+        <!-- 3.1 دخول المشرف محدود الصلاحية -->
+        <div id="limitedAdminLogin" class="card hidden">
+            <h3>دخول مشرف محدود الصلاحية</h3>
+            <p>أدخل كود القطاع واسم المشرف المخصص لك ورقمك السري:</p>
+            <input type="text" id="loginLimitedSectorCode" placeholder="كود القطاع">
+            <input type="text" id="loginLimitedUser" placeholder="اسم المشرف المحدود">
+            <input type="password" id="loginLimitedPass" placeholder="الرقم السري">
+            <button class="btn btn-warning" onclick="limitedAdminLogin()">دخول لوحة المتابعة والمشاهدة</button>
+        </div>
+
+        <!-- 3. مكرر: دخول المشرف العام الأعلى (Admin) -->
+        <div id="superAdminLogin" class="card hidden">
+            <h3 style="color: #1a365d;">🛡️ دخول المشرف العام الأعلى (Admin)</h3>
+            <p>أدخل اسم المستخدم والرقم السري الخاص بك:</p>
+            <input type="text" id="superAdminNameInput" placeholder="اسم المستخدم">
+            <input type="password" id="superAdminPassInput" placeholder="الرقم السري">
+            <button class="btn btn-danger" onclick="superAdminLogin()">دخول لوحة التحكم الشاملة</button>
+        </div>
+
+        <!-- 4. لوحة تحكم المشرف العام الأعلى (Admin) -->
+        <div id="superAdminDash" class="card hidden">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h2 style="margin: 0;">🛡️ لوحة التحكم الشاملة - المشرف الأعلى (Admin)</h2>
+                <button class="btn btn-danger" onclick="logoutSystem()">🚪 تسجيل الخروج</button>
+            </div>
+            <p>إدارة واستعراض كافة القطاعات والتحكم بصلاحياتها واشتراكاتها:</p>
+            
+            <div style="background: #edf2f7; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #cbd5e0;">
+                <h4 style="margin-top:0; color:#1a365d;">⚙️ إعدادات حساب المشرف الأعلى:</h4>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <div style="flex:1; min-width: 200px;">
+                        <label style="font-size: 13px;">تغيير اسم المستخدم:</label>
+                        <input type="text" id="newSuperAdminName" placeholder="اسم المستخدم الجديد">
+                    </div>
+                    <div style="flex:1; min-width: 200px;">
+                        <label style="font-size: 13px;">تغيير الرقم السري:</label>
+                        <input type="password" id="newSuperAdminPass" placeholder="الرقم السري الجديد">
+                    </div>
+                </div>
+                <button class="btn btn-success" onclick="updateSuperAdminCredentials()" style="margin-top: 5px;">حفظ بيانات الدخول الجديدة</button>
+            </div>
+
+            <h3>قائمة القطاعات المسجلة في النظام:</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>كود القطاع</th>
+                        <th>اسم القطاع</th>
+                        <th>المشرف المسؤول</th>
+                        <th>نوع الاشتراك</th>
+                        <th>حالة الحساب</th>
+                        <th>إجراءات التحكم الشاملة</th>
+                    </tr>
+                </thead>
+                <tbody id="superAdminSectorsTable"></tbody>
+            </table>
+        </div>
+
+        <!-- نافذة تعديل القطاع من قِبل المشرف الأعلى -->
+        <div id="editSectorModal" class="modal hidden">
+            <div class="modal-content">
+                <h3>تعديل بيانات القطاع والاشتراك</h3>
+                <input type="hidden" id="editSecCode">
+                
+                <p><label>اسم القطاع:</label></p>
+                <input type="text" id="editSecName">
+
+                <p><label>اسم المشرف العام:</label></p>
+                <input type="text" id="editSecAdminName">
+
+                <p><label>الشفرة السرية الجديدة:</label></p>
+                <input type="text" id="editSecPass">
+
+                <p><label>تاريخ انتهاء الاشتراك:</label></p>
+                <input type="date" id="editSecExpiry">
+
+                <div style="margin-top: 15px; background: #edf2f7; padding: 10px; border-radius: 6px;">
+                    <label style="cursor: pointer; font-weight: bold; color: #1a365d;">
+                        <input type="checkbox" id="editSecIsFreeToggle" style="width: auto; margin-left: 5px;"> 🎁 جعل حساب هذا القطاع مجانياً بالكامل (إعفاء من الرسوم والقيود)
+                    </label>
+                </div>
+
+                <br>
+                <button class="btn btn-success" onclick="saveEditedSectorBySuperAdmin()">حفظ التعديلات</button>
+                <button class="btn btn-danger" onclick="closeEditSectorModal()">إلغاء</button>
+            </div>
+        </div>
+
+        <!-- 5. لوحة تحكم المشرف العام للقطاع -->
+        <div id="adminDash" class="card hidden">
+            <div id="countdownBanner" class="countdown-banner hidden">
+                <span id="countdownText">⏳ المتبقي على انتهاء الاشتراك: ...</span>
+                <button class="btn btn-warning" style="padding: 4px 10px; font-size: 12px;" onclick="openUpgradeModalDirect()">تجديد وتمديد الباقة</button>
+            </div>
+
+            <div class="print-header">
+                <h2 id="printSectorTitle">تقرير إنجازات القطاع</h2>
+                <p id="printReportMeta">تاريخ التقرير: 2026</p>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <h2 style="margin: 0;" id="adminDashTitleHeading">لوحة تحكم المشرف العام</h2>
+                <button class="btn btn-danger" onclick="logoutSystem()">🚪 تسجيل الخروج</button>
+            </div>
+            <div id="sectorInfoBadge" class="sector-badge"></div>
+
+            <!-- صندوق تخصيص وتعديل حساب القطاع، عنوان النظام، والشعارات -->
+            <div style="background: #edf2f7; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #cbd5e0;" id="adminCustomizationCard">
+                <h4 style="margin-top:0; color:#1a365d;">🎨 تخصيص القطاع، عنوان الشريط العلوي، والشعارات:</h4>
+                
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <div style="flex:1; min-width: 200px;">
+                        <label style="font-size: 13px;">تعديل اسم القطاع:</label>
+                        <input type="text" id="settingsSectorName" placeholder="اسم القطاع الجديد">
+                    </div>
+                    <div style="flex:1; min-width: 200px;">
+                        <label style="font-size: 13px;">تعديل عنوان النظام (الشريط العلوي):</label>
+                        <input type="text" id="settingsAppTitle" placeholder="مثال: نظام إدارة إنجازات الإدارة...">
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 5px;">
+                    <div style="flex:1; min-width: 200px;">
+                        <label style="font-size: 13px;">تغيير الشفرة السرية للمشرف:</label>
+                        <input type="password" id="newAdminPassword" placeholder="الشفرة السرية الجديدة">
+                    </div>
+                </div>
+
+                <!-- إعدادات شعار الشريط العلوي (Header Logo) -->
+                <div style="margin-top: 12px; border-top: 1px dashed #cbd5e0; padding-top: 10px;">
+                    <label style="font-size: 13px; font-weight: bold; color: #1a365d;">⭐ شعار وسط الشريط العلوي (Header Logo):</label>
+                    <div style="display: flex; gap: 15px; margin-bottom: 8px;">
+                        <label><input type="radio" name="headerLogoSourceType" value="url" checked onclick="toggleHeaderLogoSourceInput()"> لصق رابط الشعار (URL)</label>
+                        <label><input type="radio" name="headerLogoSourceType" value="file" onclick="toggleHeaderLogoSourceInput()"> تحميل من الحاسب الآلي (ملف)</label>
+                    </div>
+                    <div id="headerLogoUrlContainer">
+                        <input type="text" id="headerLogoUrlInput" placeholder="رابط الشعار العلوي">
+                    </div>
+                    <div id="headerLogoFileContainer" class="hidden">
+                        <input type="file" id="headerLogoFileInput" accept="image/*" style="background: white; padding: 6px;">
+                    </div>
+                </div>
+
+                <!-- إعدادات خلفية صفحة العمل -->
+                <div style="margin-top: 12px; border-top: 1px dashed #cbd5e0; padding-top: 10px;">
+                    <label style="font-size: 13px; font-weight: bold; color: #1a365d;">🖼️ خلفية صفحة العمل العامة:</label>
+                    <div style="display: flex; gap: 15px; margin-bottom: 8px;">
+                        <label><input type="radio" name="bgSourceType" value="url" checked onclick="toggleBgSourceInput()"> لصق رابط خلفية (URL)</label>
+                        <label><input type="radio" name="bgSourceType" value="file" onclick="toggleBgSourceInput()"> تحميل من الحاسب الآلي (ملف)</label>
+                    </div>
+                    
+                    <div id="bgUrlContainer">
+                        <input type="text" id="sectorBgUrlInput" placeholder="رابط الخلفية">
+                    </div>
+                    <div id="bgFileContainer" class="hidden">
+                        <input type="file" id="sectorBgFileInput" accept="image/*" style="background: white; padding: 6px;">
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap; margin-top: 10px;">
+                    <div style="flex:1; min-width: 200px;">
+                        <label style="font-size: 13px;">درجة وضوح خلفية العمل:</label>
+                        <select id="sectorBgOpacitySelect">
+                            <option value="0.08">شفاف جداً (هادئ 8%)</option>
+                            <option value="0.15" selected>شفاف متوسط (15%)</option>
+                            <option value="0.40">واضح متوسط (40%)</option>
+                            <option value="0.80">غامق وواضح (80%)</option>
+                            <option value="1.0">غامق بالكامل (100%)</option>
+                        </select>
+                    </div>
+                    <div style="flex:1; min-width: 200px; padding-top: 20px;">
+                        <button class="btn btn-success" onclick="saveSectorCustomizations()" style="width: 100%;">حفظ إعدادات وتخصيصات القطاع</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- قسم تعيين وإدارة المشرفين محدودي الصلاحية -->
+            <div style="background: #fffaf0; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #fbd38d;" id="limitedAdminsSectionCard">
+                <h4 style="margin-top:0; color:#b7791f;">👤 تعيين مشرف محدود الصلاحية (مشاهدة ومتابعة فقط):</h4>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <input type="text" id="limAdminName" placeholder="اسم المشرف المحدود" style="flex:1; margin-bottom:5px;">
+                    <input type="password" id="limAdminPass" placeholder="الرقم السري" style="flex:1; margin-bottom:5px;">
+                    <button class="btn btn-warning" onclick="addLimitedAdmin()" style="margin-bottom:5px;">إضافة المشرف</button>
+                </div>
+                <table>
+                    <thead><tr><th>اسم المشرف</th><th>الصلاحية</th><th>إجراء</th></tr></thead>
+                    <tbody id="limitedAdminsTableBody"></tbody>
+                </table>
+            </div>
+            
+            <div class="filter-box">
+                <b style="white-space: nowrap;">🖨️ طباعة التقارير حسب الفترة:</b>
+                <select id="reportPeriodSelect" style="width: auto; margin: 0;">
+                    <option value="daily">يومي (اليوم)</option>
+                    <option value="weekly">أسبوعي (آخر 7 أيام)</option>
+                    <option value="monthly" selected>شهري (الشهر الحالي)</option>
+                    <option value="quarterly">كل 3 أشهر (الربع الحالي)</option>
+                    <option value="semi">نصف سنوي (6 أشهر)</option>
+                    <option value="nine_months">كل 9 أشهر</option>
+                    <option value="yearly">سنوي (السنة كاملة)</option>
+                </select>
+                <select id="adminYearSelect" style="width: auto; margin: 0;">
+                    <option value="2026" selected>2026</option>
+                    <option value="2025">2025</option>
+                </select>
+                <button class="btn btn-print" onclick="printFilteredReport()">🖨️ طباعة التقرير العام / PDF</button>
+            </div>
+
+            <div id="adminHonorBoardContainer" class="honor-board hidden">
+                <h3 id="adminHonorBoardTitle">🏆 لوحة الشرف الشهرية - المركز الأول 🏆</h3>
+                <h2 id="adminTopEmployeeName" style="margin: 5px 0;">-</h2>
+                <p id="adminTopEmployeeStats" style="margin: 0; font-weight: bold;">أعلى عدد إنجازات للمهام</p>
+            </div>
+
+            <h4 id="adminTopTenTitle">⭐ أفضل الموظفين إنجازاً للمهام (Top 10):</h4>
+            <table>
+                <thead><tr><th>المركز</th><th>اسم الموظف</th><th>عدد المهام المنجزة</th></tr></thead>
+                <tbody id="adminTopTenTable"></tbody>
+            </table>
+
+            <br><hr><br>
+            <h4>📊 التقارير والرسم البياني للإنجاز (أعمدة + دوائر):</h4>
+            <div style="position: relative; height: 300px; margin-top: 15px;">
+                <canvas id="adminChart"></canvas>
+            </div>
+
+            <div id="adminFullControlsDiv">
+                <br><hr><br>
+                <h4 id="adminTasksHeaderTitle">➕ إضافة مهام معتمدة للقطاع (متاح مهام 2 بحد أقصى في الحساب برسوم):</h4>
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" id="taskName" placeholder="اسم المهمة (مثال: تدقيق الميزانية...)" style="width: 80%;">
+                    <button class="btn" onclick="addTask()" style="width: 20%;">إضافة المهمة</button>
+                </div>
+                <table>
+                    <thead><tr><th>#</th><th>اسم المهمة</th><th>إجراءات</th></tr></thead>
+                    <tbody id="adminTasksTable"></tbody>
+                </table>
+
+                <br><hr><br>
+                <h4 id="adminDeptsHeaderTitle">📂 إضافة إدارة / قسم فرعي داخل القطاع (متاح إدارة 1 بحد أقصى في الحساب برسوم):</h4>
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" id="deptName" placeholder="اسم الإدارة الفرعية (مثال: الإدارة المالية...)" style="width: 80%;">
+                    <button class="btn" onclick="addDepartment()" style="width: 20%;">إضافة الإدارة</button>
+                </div>
+                <table>
+                    <thead><tr><th>#</th><th>اسم الإدارة الفرعية</th><th>إجراءات</th></tr></thead>
+                    <tbody id="adminDeptTable"></tbody>
+                </table>
+            </div>
+
+            <br><hr><br>
+            <h4 id="adminEmpsHeaderTitle">👥 سجل إنجازات الموظفين (متاح حتى 4 موظفين في الحساب برسوم):</h4>
+            <table>
+                <thead>
+                    <tr>
+                        <th>اسم الموظف</th>
+                        <th>الإدارة التابع لها</th>
+                        <th>إجمالي الإنجازات</th>
+                        <th>استعراض السجل والطباعة</th>
+                        <th id="adminEmpActionsTh">إجراءات الحساب</th>
+                    </tr>
+                </thead>
+                <tbody id="adminEmpListTable"></tbody>
+            </table>
+        </div>
+
+        <!-- النافذة المنبثقة لتعديل بيانات الموظف من قِبل المشرف العام -->
+        <div id="editEmpModal" class="modal hidden">
+            <div class="modal-content">
+                <h3>تعديل حساب الموظف</h3>
+                <input type="hidden" id="editEmpIndexInput">
+                
+                <p><label>اسم الموظف:</label></p>
+                <input type="text" id="editEmpNameInput">
+
+                <p><label>الرقم السري الجديد للموظف:</label></p>
+                <input type="text" id="editEmpPassInput" placeholder="أدخل الرقم السري الجديد">
+
+                <p><label>الإدارة التابع لها:</label></p>
+                <select id="editEmpDeptSelect">
+                    <option value="عام">-- الإدارة العامة --</option>
+                </select>
+
+                <br>
+                <button class="btn btn-success" onclick="saveEditedEmployeeByAdmin()">حفظ التعديلات</button>
+                <button class="btn btn-danger" onclick="closeEditEmpModal()">إلغاء</button>
+            </div>
+        </div>
+
+        <!-- 6. النافذة المنبثقة لسجل الموظف -->
+        <div id="empAchievementsModal" class="modal hidden" onclick="if(event.target === this) closeModal();">
+            <div class="modal-content">
+                <span class="close-btn" onclick="closeModal()">&times;</span>
+                <div class="print-header">
+                    <h2>تقرير إنجازات الموظف الفردي</h2>
+                </div>
+                <h3 id="modalEmpTitle">سجل إنجازات الموظف</h3>
+                <div style="margin-bottom: 15px; text-align: left;">
+                    <button class="btn btn-print" onclick="window.print()">🖨️ طباعة تقرير هذا الموظف / PDF</button>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>التاريخ</th>
+                            <th>اسم المهمة</th>
+                            <th>رقم المهمة</th>
+                            <th>تفاصيل المحتوى</th>
+                        </tr>
+                    </thead>
+                    <tbody id="modalEmpTableBody"></tbody>
+                </table>
+                <br>
+                <button class="btn btn-danger" onclick="closeModal()">إغلاق النافذة</button>
+            </div>
+        </div>
+
+        <!-- نافذة ترقية الاشتراك وبوابة الدفع الإلكتروني وتوضيح المدة والرسوم -->
+        <div id="upgradeModal" class="modal hidden">
+            <div class="modal-content" style="text-align: center;">
+                <h3>💳 سداد رسوم الاشتراك وتمديد الباقة</h3>
+                <p id="upgradeReasonText">اختر مدة الاشتراك المطلوبة ورسومها لتفعيل حسابك:</p>
+                
+                <select id="upgradePlanSelect" style="margin: 15px 0; font-weight: bold; font-size: 15px;" onchange="updatePlanDetailsDisplay()">
+                    <option value="1|4">🗓️ مدة شهر واحد - الرسوم: 4$ (عدد لا محدود من الموارد)</option>
+                    <option value="3|6">🗓️ مدة 3 أشهر - الرسوم: 6$ (عدد لا محدود من الموارد)</option>
+                    <option value="6|8">🗓️ مدة 6 أشهر - الرسوم: 8$ (عدد لا محدود من الموارد)</option>
+                    <option value="9|12">🗓️ مدة 9 أشهر - الرسوم: 12$ (عدد لا محدود من الموارد)</option>
+                    <option value="12|20" selected>🗓️ سنة كاملة (12 شهر) - الرسوم: 20$ (عدد لا محدود من الموارد)</option>
+                </select>
+
+                <div id="selectedPlanSummary" style="background: #e2e8f0; padding: 10px; border-radius: 6px; margin-bottom: 15px; font-weight: bold; color: #1a365d;">
+                    المدة المحددة: سنة كاملة | إجمالي الرسوم المطلوبة: 20 دولار
+                </div>
+
+                <button class="btn btn-success" id="openPaymentFormBtn" onclick="togglePaymentForm()" style="width: 100%; font-size: 16px; padding: 12px; margin-bottom: 15px;">💳 الدفع بـ (فيزا ، ماستر كارد ، مدى)</button>
+
+                <div id="cardPaymentForm" class="hidden" style="background: #edf2f7; padding: 15px; border-radius: 8px; text-align: right; margin-bottom: 15px; border: 1px solid #cbd5e0;">
+                    <p style="margin-top:0; color:#1a365d; font-weight:bold;">بيانات البطاقة الإلكترونية:</p>
+                    
+                    <p style="margin-bottom:3px; font-size:13px;">الحساب البنكي المستقبل للرسوم (الإيبان):</p>
+                    <input type="text" value="SA1465000000323148366001" readonly style="background:#e2e8f0; font-family:monospace; font-size:13px; text-align:center;">
+
+                    <p style="margin-bottom:3px; font-size:13px;">اسم الحامل على البطاقة:</p>
+                    <input type="text" id="cardHolderName" placeholder="الاسم كما هو مكتوب على البطاقة">
+
+                    <p style="margin-bottom:3px; font-size:13px;">رقم البطاقة (16 رقم):</p>
+                    <input type="text" id="cardNumber" maxlength="16" placeholder="XXXX XXXX XXXX XXXX" style="direction:ltr; text-align:right;">
+
+                    <div style="display: flex; gap: 10px;">
+                        <div style="flex:1;">
+                            <p style="margin-bottom:3px; font-size:13px;">تاريخ الانتهاء (MM/YY):</p>
+                            <input type="text" id="cardExpiry" maxlength="5" placeholder="MM/YY" style="direction:ltr; text-align:right;">
+                        </div>
+                        <div style="flex:1;">
+                            <p style="margin-bottom:3px; font-size:13px;">رمز الأمان (CVV):</p>
+                            <input type="password" id="cardCvv" maxlength="4" placeholder="123" style="direction:ltr; text-align:right;">
+                        </div>
+                    </div>
+
+                    <button class="btn btn-success" onclick="processPaymentCard()" style="width:100%; margin-top:5px; padding:10px;">إتمام عملية الدفع وتفعيل المدة المطلوبة</button>
+                </div>
+
+                <button class="btn btn-danger" onclick="closeUpgradeModal()" style="margin-top: 5px; width: 100%;">إغلاق</button>
+            </div>
+        </div>
+
+        <!-- 7. نافذة دليل الاستخدام -->
+        <div id="guideModal" class="modal hidden" onclick="if(event.target === this) closeGuideModal();">
+            <div class="modal-content">
+                <span class="close-btn" onclick="closeGuideModal()">&times;</span>
+                <h3>📖 دليل استخدام التطبيق</h3>
+                <hr>
+                <h4>1. النظام والرسوم:</h4>
+                <ul>
+                    <li>القطاعات المسجلة تبدأ برسوم واشتراكات، ولا يظهر عداد انتهاء الاشتراك التنازلي في لوحة التحكم إلا بعد إتمام دفع الرسوم واختيار مدة الاشتراك المطلوبة.</li>
+                    <li>يمكن للمشرف العام الأعلى (**Admin**) إعفاء أي قطاع وجعله مجانياً بالكامل من لوحة التحكم الشاملة.</li>
+                </ul>
+                <br>
+                <button class="btn btn-danger" onclick="closeGuideModal()">إغلاق الدليل</button>
+            </div>
+        </div>
+
+        <!-- 8. النافذة المنبثقة لتعديل المهمة من قِبل الموظف -->
+        <div id="editAchModal" class="modal hidden">
+            <div class="modal-content">
+                <h3>تعديل بيانات المهمة المنجزة</h3>
+                <p><label>اسم المهمة:</label></p>
+                <select id="editTaskSelect"></select>
+                
+                <p><label>رقم المهمة:</label></p>
+                <input type="text" id="editTaskNumber">
+                
+                <p><label>محتوى المهمة تفصيلياً:</label></p>
+                <input type="text" id="editTaskContent">
+                
+                <p><label>تاريخ الإنجاز:</label></p>
+                <input type="date" id="editAchieveDate">
+                
+                <br>
+                <button class="btn btn-success" onclick="saveEditedAchievement()">حفظ التعديلات</button>
+                <button class="btn btn-danger" onclick="closeEditModal()">إلغاء</button>
+            </div>
+        </div>
+
+        <!-- 9. دخول الموظف -->
+        <div id="empLogin" class="card hidden">
+            <h3>تسجيل دخول الموظف</h3>
+            <p>أدخل كود القطاع المزود من المشرف وبياناتك:</p>
+            <input type="text" id="empSectorCode" placeholder="كود القطاع (مثل: SEC-8492)">
+            <input type="text" id="empUsername" placeholder="اسم الموظف / اسم المستخدم">
+            <input type="password" id="empPassword" placeholder="الرقم السري الخاص بك (للدخول لاحقاً)">
+            <p><label>اختر الإدارة الفرعية التابع لها:</label></p>
+            <select id="empDeptSelect">
+                <option value="عام">-- الإدارة العامة --</option>
+            </select>
+            <button class="btn" onclick="empLogin()">دخول لصفحة الإنجاز</button>
+        </div>
+
+        <!-- 10. صفحة الموظف -->
+        <div id="empDash" class="card hidden">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <h3 style="margin: 0;">تسجيل إنجاز جديد</h3>
+                <button class="btn btn-danger" onclick="logoutSystem()">🚪 تسجيل الخروج</button>
+            </div>
+            <div id="empSectorBadge" class="sector-badge"></div>
+
+            <!-- صندوق تغيير الرقم السري الخاص بالموظف -->
+            <div style="background: #edf2f7; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #cbd5e0;">
+                <h4 style="margin-top:0; color:#1a365d;">🔑 تغيير الرقم السري الخاص بك:</h4>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <input type="password" id="newEmpPassword" placeholder="أدخل الرقم السري الجديد" style="margin:0; flex:1;">
+                    <button class="btn btn-success" onclick="updateEmpPassword()" style="white-space: nowrap;">تحديث الرقم السري</button>
+                </div>
+            </div>
+
+            <div id="empHonorBoardContainer" class="honor-board hidden">
+                <h3 id="empHonorBoardTitle">🏆 لوحة الشرف الشهرية - المركز الأول 🏆</h3>
+                <h2 id="empTopEmployeeName" style="margin: 5px 0;">-</h2>
+                <p id="empTopEmployeeStats" style="margin: 0; font-weight: bold;">أعلى عدد إنجازات للمهام</p>
+            </div>
+
+            <h4 id="empTopTenTitle">⭐ أفضل الموظفين إنجازاً للقطاع (Top 10):</h4>
+            <table>
+                <thead><tr><th>المركز</th><th>اسم الموظف</th><th>عدد المهام المنجزة</th></tr></thead>
+                <tbody id="empTopTenTable"></tbody>
+            </table>
+
+            <br><hr><br>
+            <p><label>اختر المهمة المحددة من المشرف:</label></p>
+            <select id="empTaskSelect">
+                <option value="">-- اختر اسم المهمة --</option>
+            </select>
+
+            <div style="background: #edf2f7; padding: 15px; border-radius: 6px; margin-bottom: 12px;">
+                <p style="margin-top:0;"><b>تفاصيل المهمة وتوثيقها:</b></p>
+                <p><label>رقم المهمة:</label></p>
+                <input type="text" id="empTaskNumber" placeholder="أدخل رقم المهمة (مثال: T-204)">
+                
+                <p><label>محتوى المهمة تفصيلياً:</label></p>
+                <input type="text" id="empTaskContent" placeholder="اكتب محتوى وتفاصيل هذه المهمة">
+            </div>
+            
+            <p><label>تاريخ الإنجاز:</label></p>
+            <input type="date" id="empAchieveDate">
+
+            <button class="btn btn-success" onclick="saveAchievement()">حفظ وتثبيت الإنجاز</button>
+
+            <br><br><hr><br>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h4>📊 سجل إنجازاتي التفصيلي:</h4>
+                <button class="btn btn-print" onclick="window.print()">🖨️ طباعة إنجازاتي / PDF</button>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>التاريخ</th>
+                        <th>اسم المهمة</th>
+                        <th>رقم المهمة</th>
+                        <th>تفاصيل المحتوى</th>
+                        <th>إجراءات الإنجاز</th>
+                    </tr>
+                </thead>
+                <tbody id="empHistoryTable"></tbody>
+            </table>
+        </div>
+
+    </div>
+
+    <!-- التوقيع في الأسفل مع زر Admin المدمج -->
+    <footer>
+        <span>خليل علي | <a href="mailto:hidarat@gmail.com">hidarat@gmail.com</a></span>
+        <button class="btn btn-danger" onclick="showPage('superAdminLogin')" style="padding: 4px 12px; font-size: 13px;">Admin</button>
+    </footer>
+
+    <script>
+        let sectors = JSON.parse(localStorage.getItem('sectors_db')) || {};
+        let currentSectorCode = '';
+        let currentEmpUser = '';
+        let currentUserRole = 'admin'; // 'admin', 'limitedAdmin', 'employee'
+        let editingAchIndex = -1;
+        let pageHistory = ['home'];
+
+        let superAdminCreds = JSON.parse(localStorage.getItem('super_admin_creds')) || { name: "خليل علي", pass: "12345" };
+
+        function showPage(pageId, isBack = false) {
+            if (!isBack && pageHistory[pageHistory.length - 1] !== pageId) {
+                pageHistory.push(pageId);
+            }
+            ['home','register','adminLogin','limitedAdminLogin','superAdminLogin','superAdminDash','adminDash','empLogin','empDash'].forEach(p => document.getElementById(p).classList.add('hidden'));
+            document.getElementById(pageId).classList.remove('hidden');
+
+            if (pageId === 'home' || pageId === 'adminLogin' || pageId === 'limitedAdminLogin' || pageId === 'superAdminLogin' || pageId === 'empLogin' || pageId === 'register') {
+                applyBackgroundStyle('', 0.15);
+                applyHeaderLogo('');
+                applyAppTitleText("نظام إدارة وإحصاء الإنجازات");
+            }
+        }
+
+        function goBack() {
+            if (pageHistory.length > 1) {
+                pageHistory.pop();
+                let previousPage = pageHistory[pageHistory.length - 1];
+                showPage(previousPage, true);
+            }
+        }
+
+        function logoutSystem() {
+            currentSectorCode = '';
+            currentEmpUser = '';
+            currentUserRole = 'admin';
+            applyBackgroundStyle('', 0.15);
+            applyHeaderLogo('');
+            applyAppTitleText("نظام إدارة وإحصاء الإنجازات");
+            showPage('home');
+        }
+
+        function openGuideModal() { document.getElementById('guideModal').classList.remove('hidden'); }
+        function closeGuideModal() { document.getElementById('guideModal').classList.add('hidden'); }
+
+        function applyBackgroundStyle(url, opacity) {
+            let overlay = document.getElementById('dynamicBgOverlay');
+            if (url) {
+                overlay.style.backgroundImage = `url('${url}')`;
+                overlay.style.opacity = opacity;
+                overlay.style.display = 'block';
+            } else {
+                overlay.style.backgroundImage = 'none';
+                overlay.style.display = 'none';
+            }
+        }
+
+        function applyHeaderLogo(url) {
+            let container = document.getElementById('headerLogoContainer');
+            if (url) {
+                container.innerHTML = `<img src="${url}" alt="شعار الشريط العلوي">`;
+            } else {
+                container.innerHTML = '';
+            }
+        }
+
+        function applyAppTitleText(text) {
+            document.getElementById('appTitleText').textContent = text || "نظام إدارة وإحصاء الإنجازات";
+        }
+
+        function toggleBgSourceInput() {
+            let radios = document.getElementsByName('bgSourceType');
+            let type = 'url';
+            for (let r of radios) { if (r.checked) type = r.value; }
+            if (type === 'url') {
+                document.getElementById('bgUrlContainer').classList.remove('hidden');
+                document.getElementById('bgFileContainer').classList.add('hidden');
+            } else {
+                document.getElementById('bgUrlContainer').classList.add('hidden');
+                document.getElementById('bgFileContainer').classList.remove('hidden');
+            }
+        }
+
+        function toggleHeaderLogoSourceInput() {
+            let radios = document.getElementsByName('headerLogoSourceType');
+            let type = 'url';
+            for (let r of radios) { if (r.checked) type = r.value; }
+            if (type === 'url') {
+                document.getElementById('headerLogoUrlContainer').classList.remove('hidden');
+                document.getElementById('headerLogoFileContainer').classList.add('hidden');
+            } else {
+                document.getElementById('headerLogoUrlContainer').classList.add('hidden');
+                document.getElementById('headerLogoFileContainer').classList.remove('hidden');
+            }
+        }
+
+        function saveSectorCustomizations() {
+            let sec = sectors[currentSectorCode];
+            let newName = document.getElementById('settingsSectorName').value.trim();
+            let newAppTitle = document.getElementById('settingsAppTitle').value.trim();
+            let newPass = document.getElementById('newAdminPassword').value.trim();
+            let opacity = document.getElementById('sectorBgOpacitySelect').value;
+
+            if (newName) sec.name = newName;
+            if (newAppTitle) sec.appTitle = newAppTitle;
+            if (newPass) sec.pass = newPass;
+            sec.bgOpacity = opacity;
+
+            let logoRadios = document.getElementsByName('headerLogoSourceType');
+            let logoType = 'url';
+            for (let r of logoRadios) { if (r.checked) logoType = r.value; }
+
+            if (logoType === 'file') {
+                let logoFileInput = document.getElementById('headerLogoFileInput');
+                if (logoFileInput.files && logoFileInput.files[0]) {
+                    let reader = new FileReader();
+                    reader.onload = function(e) {
+                        sec.headerLogoUrl = e.target.result;
+                        processBgAndSave(sec, opacity);
+                    };
+                    reader.readAsDataURL(logoFileInput.files[0]);
+                    return;
+                }
+            } else {
+                sec.headerLogoUrl = document.getElementById('headerLogoUrlInput').value.trim();
+            }
+
+            processBgAndSave(sec, opacity);
+        }
+
+        function processBgAndSave(sec, opacity) {
+            let bgRadios = document.getElementsByName('bgSourceType');
+            let bgType = 'url';
+            for (let r of bgRadios) { if (r.checked) bgType = r.value; }
+
+            if (bgType === 'file') {
+                let fileInput = document.getElementById('sectorBgFileInput');
+                if (fileInput.files && fileInput.files[0]) {
+                    let reader = new FileReader();
+                    reader.onload = function(e) {
+                        sec.bgUrl = e.target.result;
+                        localStorage.setItem('sectors_db', JSON.stringify(sectors));
+                        applyBackgroundStyle(sec.bgUrl, opacity);
+                        applyHeaderLogo(sec.headerLogoUrl);
+                        applyAppTitleText(sec.appTitle);
+                        loadAdminDashboard();
+                        alert('تم حفظ إعدادات القطاع بنجاح!');
+                    };
+                    reader.readAsDataURL(fileInput.files[0]);
+                    return;
+                }
+            } else {
+                sec.bgUrl = document.getElementById('sectorBgUrlInput').value.trim();
+            }
+
+            localStorage.setItem('sectors_db', JSON.stringify(sectors));
+            applyBackgroundStyle(sec.bgUrl || '', opacity);
+            applyHeaderLogo(sec.headerLogoUrl || '');
+            applyAppTitleText(sec.appTitle || "نظام إدارة وإحصاء الإنجازات");
+            loadAdminDashboard();
+            alert('تم حفظ إعدادات القطاع بنجاح!');
+        }
+
+        function addLimitedAdmin() {
+            let name = document.getElementById('limAdminName').value.trim();
+            let pass = document.getElementById('limAdminPass').value.trim();
+            if(!name || !pass) { alert('يرجى كتابة اسم المشرف ورقمة السري.'); return; }
+            let sec = sectors[currentSectorCode];
+            if(!sec.limitedAdmins) sec.limitedAdmins = [];
+            sec.limitedAdmins.push({ name: name, pass: pass });
+            localStorage.setItem('sectors_db', JSON.stringify(sectors));
+            document.getElementById('limAdminName').value = '';
+            document.getElementById('limAdminPass').value = '';
+            loadAdminDashboard();
+            alert('تمت إضافة المشرف بنجاح.');
+        }
+
+        function deleteLimitedAdmin(index) {
+            sectors[currentSectorCode].limitedAdmins.splice(index, 1);
+            localStorage.setItem('sectors_db', JSON.stringify(sectors));
+            loadAdminDashboard();
+        }
+
+        function limitedAdminLogin() {
+            let code = document.getElementById('loginLimitedSectorCode').value.trim();
+            let user = document.getElementById('loginLimitedUser').value.trim();
+            let pass = document.getElementById('loginLimitedPass').value.trim();
+
+            if (!sectors[code]) { alert('كود القطاع غير صحيح!'); return; }
+            let sec = sectors[code];
+            if(!sec.limitedAdmins) sec.limitedAdmins = [];
+
+            let found = sec.limitedAdmins.find(a => a.name === user && a.pass === pass);
+            if (found) {
+                if (!checkSubscriptionExpiry(code)) return;
+                currentSectorCode = code;
+                currentUserRole = 'limitedAdmin';
+                applyBackgroundStyle(sec.bgUrl || '', sec.bgOpacity || '0.15');
+                applyHeaderLogo(sec.headerLogoUrl || '');
+                applyAppTitleText(sec.appTitle || "نظام إدارة وإحصاء الإنجازات");
+                loadAdminDashboard();
+                showPage('adminDash');
+            } else {
+                alert('اسم المشرف أو الرقم السري غير صحيح!');
+            }
+        }
+
+        function updateEmpPassword() {
+            let newPass = document.getElementById('newEmpPassword').value.trim();
+            if (!newPass) { alert('يرجى إدخال الرقم السري الجديد.'); return; }
+            let sec = sectors[currentSectorCode];
+            let empObj = sec.employees.find(e => (typeof e === 'object' ? e.name : e) === currentEmpUser);
+            
+            if (empObj) {
+                if (typeof empObj === 'object') { empObj.pass = newPass; }
+                else {
+                    let index = sec.employees.indexOf(empObj);
+                    sec.employees[index] = { name: currentEmpUser, pass: newPass, dept: 'عام' };
+                }
+                localStorage.setItem('sectors_db', JSON.stringify(sectors));
+                alert('تم تحديث الرقم السري الخاص بك بنجاح!');
+                document.getElementById('newEmpPassword').value = '';
+            }
+        }
+
+        function superAdminLogin() {
+            let name = document.getElementById('superAdminNameInput').value.trim();
+            let pass = document.getElementById('superAdminPassInput').value.trim();
+
+            if (name === superAdminCreds.name && pass === superAdminCreds.pass) {
+                document.getElementById('newSuperAdminName').value = superAdminCreds.name;
+                document.getElementById('newSuperAdminPass').value = superAdminCreds.pass;
+                loadSuperAdminDashboard();
+                showPage('superAdminDash');
+            } else {
+                alert('عذراً، اسم المستخدم أو الرقم السري غير صحيح!');
+            }
+        }
+
+        function updateSuperAdminCredentials() {
+            let newName = document.getElementById('newSuperAdminName').value.trim();
+            let newPass = document.getElementById('newSuperAdminPass').value.trim();
+            if (!newName || !newPass) return;
+            superAdminCreds.name = newName;
+            superAdminCreds.pass = newPass;
+            localStorage.setItem('super_admin_creds', JSON.stringify(superAdminCreds));
+            alert('تم تحديث بيانات الدخول بنجاح!');
+        }
+
+        function loadSuperAdminDashboard() {
+            let tbody = document.getElementById('superAdminSectorsTable');
+            tbody.innerHTML = '';
+            let codes = Object.keys(sectors);
+            if (codes.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">لا توجد قطاعات مسجلة</td></tr>';
+                return;
+            }
+            codes.forEach(code => {
+                let sec = sectors[code];
+                let statusText = sec.isDisabled ? '<span style="color:red;">موقوف</span>' : '<span style="color:green;">نشط</span>';
+                let subTypeText = sec.isFree ? '<b style="color:blue;">مجاني بالكامل</b>' : `برسوم (${sec.expiryDate})`;
+                let toggleBtnText = sec.isDisabled ? `<button class="btn btn-success" onclick="toggleSectorStatus('${code}')">تنشيط</button>` : `<button class="btn btn-warning" onclick="toggleSectorStatus('${code}')">إيقاف</button>`;
+
+                tbody.innerHTML += `<tr>
+                    <td><b>${code}</b></td><td>${sec.name}</td><td>${sec.adminName || '-'}</td><td>${subTypeText}</td><td>${statusText}</td>
+                    <td>
+                        <button class="btn" onclick="openEditSectorModal('${code}')">تعديل وصلاحيات</button>
+                        ${toggleBtnText}
+                        <button class="btn btn-danger" onclick="deleteSectorBySuperAdmin('${code}')">حذف</button>
+                    </td>
+                </tr>`;
+            });
+        }
+
+        function toggleSectorStatus(code) {
+            sectors[code].isDisabled = !sectors[code].isDisabled;
+            localStorage.setItem('sectors_db', JSON.stringify(sectors));
+            loadSuperAdminDashboard();
+        }
+
+        function deleteSectorBySuperAdmin(code) {
+            if (confirm('هل أنت متأكد من حذف القطاع؟')) {
+                delete sectors[code];
+                localStorage.setItem('sectors_db', JSON.stringify(sectors));
+                loadSuperAdminDashboard();
+            }
+        }
+
+        function openEditSectorModal(code) {
+            let sec = sectors[code];
+            document.getElementById('editSecCode').value = code;
+            document.getElementById('editSecName').value = sec.name;
+            document.getElementById('editSecAdminName').value = sec.adminName || '';
+            document.getElementById('editSecPass').value = sec.pass;
+            document.getElementById('editSecExpiry').value = sec.hasPaid ? sec.expiryDate : '';
+            document.getElementById('editSecIsFreeToggle').checked = !!sec.isFree;
+            document.getElementById('editSectorModal').classList.remove('hidden');
+        }
+
+        function closeEditSectorModal() { document.getElementById('editSectorModal').classList.add('hidden'); }
+
+        function saveEditedSectorBySuperAdmin() {
+            let code = document.getElementById('editSecCode').value;
+            let sec = sectors[code];
+            sec.name = document.getElementById('editSecName').value.trim();
+            sec.adminName = document.getElementById('editSecAdminName').value.trim();
+            let newPass = document.getElementById('editSecPass').value.trim();
+            if(newPass) sec.pass = newPass;
+
+            let isFreeChecked = document.getElementById('editSecIsFreeToggle').checked;
+            sec.isFree = isFreeChecked;
+
+            let newExpiry = document.getElementById('editSecExpiry').value;
+            if(newExpiry && !isFreeChecked) { 
+                sec.expiryDate = newExpiry; 
+                sec.hasPaid = true; // اعتباره مدفوعاً ومحدداً بمدة من قِبل المشرف الأعلى
+            } else if (isFreeChecked) {
+                sec.expiryDate = 'دائم (مجاني بالكامل)';
+            }
+
+            localStorage.setItem('sectors_db', JSON.stringify(sectors));
+            closeEditSectorModal();
+            loadSuperAdminDashboard();
+            alert('تم حفظ تعديلات القطاع وحالة الرسوم بنجاح!');
+        }
+
+        function validateRegForm() {
+            let email = document.getElementById('regEmail').value.trim();
+            let phone = document.getElementById('regPhone').value.trim();
+            document.getElementById('submitRegBtn').disabled = (email === "" && phone === "");
+        }
+
+        function registerSector() {
+            let sName = document.getElementById('regSectorName').value.trim();
+            let aName = document.getElementById('regAdminName').value.trim();
+            let aPass = document.getElementById('regAdminPass').value.trim();
+            let email = document.getElementById('regEmail').value.trim();
+            let phone = document.getElementById('regPhone').value.trim();
+
+            if (!sName || !aPass || !aName) return;
+
+            let code = 'SEC-' + Math.floor(1000 + Math.random() * 9000);
+
+            sectors[code] = { 
+                name: sName, adminName: aName, pass: aPass, email: email, phone: phone,
+                bgUrl: '', bgOpacity: '0.15', headerLogoUrl: '', appTitle: "نظام إدارة وإحصاء الإنجازات",
+                isFree: false, // يبدأ برسوم
+                hasPaid: false, // لم يتم دفع الرسوم بعد (لا يظهر العداد)
+                isDisabled: false, 
+                startDate: new Date().toISOString().split('T')[0], 
+                expiryDate: '',
+                departments: [], tasks: [], employees: [], achievements: [], limitedAdmins: [] 
+            };
+
+            localStorage.setItem('sectors_db', JSON.stringify(sectors));
+            alert(`تم إنشاء الحساب بنجاح!\nكود القطاع: [ ${code} ]\nملاحظة: الحساب يتطلب دفع رسوم الاشتراك وتحديد المدة لفتح كافة الموارد وإظهار العداد.`);
+            showPage('adminLogin');
+            document.getElementById('loginAdminSectorCode').value = code;
+        }
+
+        function checkSubscriptionExpiry(code) {
+            let sec = sectors[code];
+            if (sec.isDisabled) { alert('هذا القطاع موقوف.'); return false; }
+            if (sec.isFree) return true; // مجاني بالكامل
+            
+            // إذا لم يدفع الرسوم بعد
+            if (!sec.hasPaid) {
+                return true; // يُسمح بالدخول لصفحة التحكم لإظهار تنبيه أو زر الدفع وتحديد المدة
+            }
+
+            let today = new Date().toISOString().split('T')[0];
+            if (sec.expiryDate && sec.expiryDate < today) { 
+                alert('عذراً، انتهت صلاحية اشتراك هذا الحساب! يرجى سداد رسوم الاشتراك وتحديد المدة لتجديده.'); 
+                return false; 
+            }
+            return true;
+        }
+
+        function adminLogin() {
+            let code = document.getElementById('loginAdminSectorCode').value.trim();
+            let pass = document.getElementById('loginAdminPass').value.trim();
+
+            if (sectors[code] && sectors[code].pass === pass) {
+                if (!checkSubscriptionExpiry(code)) return;
+                currentSectorCode = code;
+                currentUserRole = 'admin';
+                let sec = sectors[code];
+                applyBackgroundStyle(sec.bgUrl || '', sec.bgOpacity || '0.15');
+                applyHeaderLogo(sec.headerLogoUrl || '');
+                applyAppTitleText(sec.appTitle || "نظام إدارة وإحصاء الإنجازات");
+                loadAdminDashboard();
+                showPage('adminDash');
+            } else {
+                alert('كود القطاع أو الشفرة السرية غير صحيحة!');
+            }
+        }
+
+        function loadAdminDashboard() {
+            let data = sectors[currentSectorCode];
+            if(!data.departments) data.departments = [];
+            if(!data.limitedAdmins) data.limitedAdmins = [];
+            
+            document.getElementById('settingsSectorName').value = data.name;
+            document.getElementById('settingsAppTitle').value = data.appTitle || "نظام إدارة وإحصاء الإنجازات";
+            document.getElementById('newAdminPassword').value = '';
+            document.getElementById('headerLogoUrlInput').value = data.headerLogoUrl && !data.headerLogoUrl.startsWith('data:') ? data.headerLogoUrl : '';
+            document.getElementById('sectorBgUrlInput').value = data.bgUrl && !data.bgUrl.startsWith('data:') ? data.bgUrl : '';
+            document.getElementById('sectorBgOpacitySelect').value = data.bgOpacity || '0.15';
+
+            if (currentUserRole === 'limitedAdmin') {
+                document.getElementById('adminDashTitleHeading').textContent = "لوحة متابعة المشرف محدود الصلاحية";
+                document.getElementById('adminCustomizationCard').classList.add('hidden');
+                document.getElementById('limitedAdminsSectionCard').classList.add('hidden');
+                document.getElementById('adminFullControlsDiv').classList.add('hidden');
+                document.getElementById('adminEmpActionsTh').textContent = "حالة الحساب";
+            } else {
+                document.getElementById('adminDashTitleHeading').textContent = "لوحة تحكم المشرف العام";
+                document.getElementById('adminCustomizationCard').classList.remove('hidden');
+                document.getElementById('limitedAdminsSectionCard').classList.remove('hidden');
+                document.getElementById('adminFullControlsDiv').classList.remove('hidden');
+                document.getElementById('adminEmpActionsTh').textContent = "إجراءات الحساب";
+            }
+
+            let planText = data.isFree ? '<b style="color:blue;">مجاني بالكامل (من قبل Admin)</b>' : (data.hasPaid ? `مدفوع (ينتهي في: ${data.expiryDate})` : '<b style="color:red;">غير مدفوع (تنبيه: يلزم سداد الرسوم)</b>');
+            document.getElementById('sectorInfoBadge').innerHTML = `القطاع: <b>${data.name}</b> | الكود: <b>${currentSectorCode}</b> | الحالة: <b>${planText}</b>`;
+            document.getElementById('printSectorTitle').textContent = `تقرير إنجازات: ${data.name}`;
+
+            let banner = document.getElementById('countdownBanner');
+            // لا يظهر العداد التنازلي إلا إذا كان الحساب مدفوعاً وتم تحديد المدة أو معفياً رسمياً
+            if (!data.isFree && data.hasPaid) {
+                banner.classList.remove('hidden');
+                updateCountdown(data.expiryDate);
+            } else {
+                banner.classList.add('hidden');
+            }
+
+            // فحص القيود حسب الدفع
+            let isFullAccess = data.isFree || data.hasPaid;
+            if (isFullAccess) {
+                document.getElementById('adminTasksHeaderTitle').textContent = "➕ إضافة مهام معتمدة للقطاع (عدد غير محدود):";
+                document.getElementById('adminDeptsHeaderTitle').textContent = "📂 إضافة إدارة / قسم فرعي داخل القطاع (عدد غير محدود):";
+                document.getElementById('adminEmpsHeaderTitle').textContent = "👥 سجل إنجازات الموظفين (عدد غير محدود):";
+            } else {
+                document.getElementById('adminTasksHeaderTitle').textContent = "➕ إضافة مهام معتمدة للقطاع (متاح مهام 2 بحد أقصى قبل دفع الرسوم):";
+                document.getElementById('adminDeptsHeaderTitle').textContent = "📂 إضافة إدارة / قسم فرعي داخل القطاع (متاح إدارة 1 بحد أقصى قبل دفع الرسوم):";
+                document.getElementById('adminEmpsHeaderTitle').textContent = "👥 سجل إنجازات الموظفين (متاح حتى 4 موظفين قبل دفع الرسوم):";
+            }
+
+            updateAdminMonthStats();
+
+            let limTable = document.getElementById('limitedAdminsTableBody');
+            limTable.innerHTML = '';
+            data.limitedAdmins.forEach((la, idx) => {
+                limTable.innerHTML += `<tr><td>${la.name}</td><td>محدود الصلاحية (مشاهدة فقط)</td><td><button class="btn btn-danger" onclick="deleteLimitedAdmin(${idx})">حذف</button></td></tr>`;
+            });
+
+            let deptTable = document.getElementById('adminDeptTable');
+            deptTable.innerHTML = '';
+            data.departments.forEach((d, index) => {
+                deptTable.innerHTML += `<tr><td>${index+1}</td><td>${d}</td><td><button class="btn btn-danger" onclick="deleteDept(${index})">حذف</button></td></tr>`;
+            });
+
+            let empListTable = document.getElementById('adminEmpListTable');
+            empListTable.innerHTML = '';
+            if (data.employees.length === 0) {
+                empListTable.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#a0aec0;">لا يوجد موظفين مسجلين</td></tr>';
+            } else {
+                let allCounts = {};
+                data.achievements.forEach(a => { allCounts[a.empUser] = (allCounts[a.empUser] || 0) + 1; });
+
+                data.employees.forEach((emp, index) => {
+                    let empName = typeof emp === 'object' ? emp.name : emp;
+                    let empDept = typeof emp === 'object' ? (emp.dept || 'عام') : 'عام';
+                    let totalAch = allCounts[empName] || 0;
+
+                    let actionsCol = currentUserRole === 'limitedAdmin' 
+                        ? `<span style="color:green; font-weight:bold;">نشط</span>`
+                        : `<button class="btn btn-warning" onclick="openEditEmpModal(${index})">تعديل ورقم سري</button>
+                           <button class="btn btn-danger" onclick="deleteEmp(${index})">حذف</button>`;
+
+                    empListTable.innerHTML += `<tr>
+                        <td><b>${empName}</b></td><td>${empDept}</td><td><b>${totalAch}</b> إنجاز</td>
+                        <td><button class="btn" onclick="viewEmpAchievements('${empName}')">🔍 عرض السجل</button></td>
+                        <td>${actionsCol}</td>
+                    </tr>`;
+                });
+            }
+
+            let tTable = document.getElementById('adminTasksTable');
+            tTable.innerHTML = '';
+            data.tasks.forEach((t, i) => {
+                tTable.innerHTML += `<tr><td>${i+1}</td><td>${t}</td><td><button class="btn btn-danger" onclick="deleteTask(${i})">حذف</button></td></tr>`;
+            });
+
+            renderChart();
+        }
+
+        function openEditEmpModal(index) {
+            if (currentUserRole === 'limitedAdmin') return;
+            let sec = sectors[currentSectorCode];
+            let emp = sec.employees[index];
+            document.getElementById('editEmpIndexInput').value = index;
+            document.getElementById('editEmpNameInput').value = (typeof emp === 'object' ? emp.name : emp);
+            document.getElementById('editEmpPassInput').value = (typeof emp === 'object' ? (emp.pass || '') : '');
+
+            let deptSelect = document.getElementById('editEmpDeptSelect');
+            deptSelect.innerHTML = '<option value="عام">-- الإدارة العامة --</option>';
+            sec.departments.forEach(d => {
+                deptSelect.innerHTML += `<option value="${d}">${d}</option>`;
+            });
+            document.getElementById('editEmpModal').classList.remove('hidden');
+        }
+
+        function closeEditEmpModal() { document.getElementById('editEmpModal').classList.add('hidden'); }
+
+        function saveEditedEmployeeByAdmin() {
+            let index = parseInt(document.getElementById('editEmpIndexInput').value);
+            let newName = document.getElementById('editEmpNameInput').value.trim();
+            let newPass = document.getElementById('editEmpPassInput').value.trim();
+            let newDept = document.getElementById('editEmpDeptSelect').value;
+
+            if (!newName || !newPass) return;
+            let sec = sectors[currentSectorCode];
+            sec.employees[index] = { name: newName, pass: newPass, dept: newDept };
+            localStorage.setItem('sectors_db', JSON.stringify(sectors));
+            closeEditEmpModal();
+            loadAdminDashboard();
+        }
+
+        function updateCountdown(expiryDateStr) {
+            let expiryDate = new Date(expiryDateStr).getTime();
+            let distance = expiryDate - new Date().getTime();
+            let textElem = document.getElementById('countdownText');
+            if (distance < 0) { textElem.textContent = "⚠️ انتهت فترة الاشتراك برسوم!"; }
+            else {
+                let days = Math.floor(distance / (1000 * 60 * 60 * 24));
+                textElem.textContent = `⏳ متبقي على انتهاء الاشتراك المدفوع: ${days} يوم`;
+            }
+        }
+
+        function updateAdminMonthStats() {
+            let data = sectors[currentSectorCode];
+            let counts = {};
+            data.achievements.forEach(a => { counts[a.empUser] = (counts[a.empUser] || 0) + 1; });
+            let sortedEmps = Object.keys(counts).map(emp => ({ name: emp, count: counts[emp] })).sort((a, b) => b.count - a.count);
+            renderHonorBoardAndTopTen(sortedEmps, 'adminHonorBoardContainer', 'adminTopEmployeeName', 'adminTopEmployeeStats', 'adminTopTenTable');
+        }
+
+        function printFilteredReport() { window.print(); }
+
+        function addDepartment() {
+            if (currentUserRole === 'limitedAdmin') return;
+            let name = document.getElementById('deptName').value.trim();
+            if(!name) return;
+            let sec = sectors[currentSectorCode];
+            
+            let isFullAccess = sec.isFree || sec.hasPaid;
+            if(!isFullAccess && sec.departments.length >= 1) {
+                document.getElementById('upgradeReasonText').textContent = "لقد وصلت للحد الأقصى للإدارات (إدارة واحدة فقط). يرجى سداد رسوم الاشتراك وتحديد المدة لفتح كافة الموارد.";
+                document.getElementById('upgradeModal').classList.remove('hidden');
+                return;
+            }
+            sec.departments.push(name);
+            localStorage.setItem('sectors_db', JSON.stringify(sectors));
+            loadAdminDashboard();
+            document.getElementById('deptName').value = '';
+        }
+
+        function deleteDept(index) {
+            if (currentUserRole === 'limitedAdmin') return;
+            sectors[currentSectorCode].departments.splice(index, 1);
+            localStorage.setItem('sectors_db', JSON.stringify(sectors));
+            loadAdminDashboard();
+        }
+
+        function viewEmpAchievements(empName) {
+            let data = sectors[currentSectorCode];
+            let empAch = data.achievements.filter(a => a.empUser === empName);
+            document.getElementById('modalEmpTitle').textContent = `سجل إنجازات: [ ${empName} ]`;
+            let tbody = document.getElementById('modalEmpTableBody');
+            tbody.innerHTML = '';
+            if(empAch.length === 0) { tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">لا توجد إنجازات</td></tr>'; }
+            else {
+                empAch.forEach(a => {
+                    tbody.innerHTML += `<tr><td>${a.date}</td><td><b>${a.taskName}</b></td><td>${a.taskNum}</td><td>${a.taskContent}</td></tr>`;
+                });
+            }
+            document.getElementById('empAchievementsModal').classList.remove('hidden');
+        }
+
+        function closeModal() { document.getElementById('empAchievementsModal').classList.add('hidden'); }
+
+        function addTask() {
+            if (currentUserRole === 'limitedAdmin') return;
+            let name = document.getElementById('taskName').value.trim();
+            if(!name) return;
+            let sec = sectors[currentSectorCode];
+            
+            let isFullAccess = sec.isFree || sec.hasPaid;
+            if(!isFullAccess && sec.tasks.length >= 2) {
+                document.getElementById('upgradeReasonText').textContent = "لقد وصلت للحد الأقصى للمهام (مهمتان فقط). يرجى سداد رسوم الاشتراك وتحديد المدة لفتح كافة الموارد.";
+                document.getElementById('upgradeModal').classList.remove('hidden');
+                return;
+            }
+            sec.tasks.push(name);
+            localStorage.setItem('sectors_db', JSON.stringify(sectors));
+            loadAdminDashboard();
+            document.getElementById('taskName').value = '';
+        }
+
+        function deleteTask(index) {
+            if (currentUserRole === 'limitedAdmin') return;
+            sectors[currentSectorCode].tasks.splice(index, 1);
+            localStorage.setItem('sectors_db', JSON.stringify(sectors));
+            loadAdminDashboard();
+        }
+
+        function deleteEmp(index) {
+            if (currentUserRole === 'limitedAdmin') return;
+            sectors[currentSectorCode].employees.splice(index, 1);
+            localStorage.setItem('sectors_db', JSON.stringify(sectors));
+            loadAdminDashboard();
+        }
+
+        function empLogin() {
+            let code = document.getElementById('empSectorCode').value.trim();
+            let user = document.getElementById('empUsername').value.trim();
+            let pass = document.getElementById('empPassword').value.trim();
+            let dept = document.getElementById('empDeptSelect').value;
+
+            if(!sectors[code]) { alert('كود القطاع غير صحيح'); return; }
+            if(!checkSubscriptionExpiry(code)) return;
+            if(!user || !pass) { alert('أدخل اسم الموظف والرقم السري'); return; }
+
+            let sec = sectors[code];
+            let existingEmp = sec.employees.find(e => (typeof e === 'object' ? e.name : e) === user);
+
+            let isFullAccess = sec.isFree || sec.hasPaid;
+
+            if(existingEmp) {
+                if(typeof existingEmp === 'object' && existingEmp.pass && existingEmp.pass !== pass) {
+                    alert('الرقم السري غير صحيح'); return;
+                }
+            } else {
+                if(!isFullAccess && sec.employees.length >= 4) {
+                    currentSectorCode = code;
+                    document.getElementById('upgradeReasonText').textContent = "لقد وصلت للحد الأقصى للموظفين (4 موظفين فقط). يرجى سداد رسوم الاشتراك وتحديد المدة لفتح كافة الموارد.";
+                    document.getElementById('upgradeModal').classList.remove('hidden');
+                    return;
+                }
+                sec.employees.push({ name: user, pass: pass, dept: dept });
+                localStorage.setItem('sectors_db', JSON.stringify(sectors));
+            }
+
+            currentSectorCode = code;
+            currentEmpUser = user;
+            currentUserRole = 'employee';
+            applyBackgroundStyle(sec.bgUrl || '', sec.bgOpacity || '0.15');
+            applyHeaderLogo(sec.headerLogoUrl || '');
+            applyAppTitleText(sec.appTitle || "نظام إدارة وإحصاء الإنجازات");
+
+            let taskSelect = document.getElementById('empTaskSelect');
+            taskSelect.innerHTML = '<option value="">-- اختر اسم المهمة --</option>';
+            sec.tasks.forEach(t => { taskSelect.innerHTML += `<option value="${t}">${t}</option>`; });
+
+            document.getElementById('empSectorBadge').innerHTML = `القطاع: <b>${sec.name}</b> | الإدارة: <b>${dept}</b> | الموظف: <b>${user}</b>`;
+            updateEmpDashboardStats();
+            loadEmpHistory();
+            showPage('empDash');
+        }
+
+        function openUpgradeModalDirect() { 
+            updatePlanDetailsDisplay();
+            document.getElementById('upgradeModal').classList.remove('hidden'); 
+        }
+        function closeUpgradeModal() { document.getElementById('upgradeModal').classList.add('hidden'); }
+        function togglePaymentForm() { document.getElementById('cardPaymentForm').classList.toggle('hidden'); }
+
+        function updatePlanDetailsDisplay() {
+            let select = document.getElementById('upgradePlanSelect');
+            let text = select.options[select.selectedIndex].text;
+            document.getElementById('selectedPlanSummary').textContent = `الخيار المحدد: ${text}`;
+        }
+
+        function processPaymentCard() {
+            let holder = document.getElementById('cardHolderName').value.trim();
+            let cNum = document.getElementById('cardNumber').value.trim();
+            let cExp = document.getElementById('cardExpiry').value.trim();
+            let cCvv = document.getElementById('cardCvv').value.trim();
+
+            if(!holder || !cNum || !cExp || !cCvv) {
+                alert('يرجى تعبئة بيانات البطاقة بشكل صحيح.');
+                return;
+            }
+
+            let planVal = document.getElementById('upgradePlanSelect').value;
+            let parts = planVal.split('|');
+            let months = parseInt(parts[0]);
+            
+            let expiryDate = new Date();
+            expiryDate.setMonth(expiryDate.getMonth() + months);
+
+            let sec = sectors[currentSectorCode];
+            sec.hasPaid = true; // تم دفع الرسوم وتحديد المدة
+            sec.expiryDate = expiryDate.toISOString().split('T')[0];
+            localStorage.setItem('sectors_db', JSON.stringify(sectors));
+
+            alert(`تمت عملية الدفع بنجاح! تم تفعيل الاشتراك لمدة (${months} أشهر).\nتاريخ انتهاء الاشتراك: ${sec.expiryDate}\nالآن سيظهر العداد التنازلي وتفتح كافة الموارد.`);
+            closeUpgradeModal();
+            loadAdminDashboard();
+        }
+
+        function updateEmpDashboardStats() {
+            let counts = {};
+            sectors[currentSectorCode].achievements.forEach(a => { counts[a.empUser] = (counts[a.empUser] || 0) + 1; });
+            let sortedEmps = Object.keys(counts).map(emp => ({ name: emp, count: counts[emp] })).sort((a, b) => b.count - a.count);
+            renderHonorBoardAndTopTen(sortedEmps, 'empHonorBoardContainer', 'empTopEmployeeName', 'empTopEmployeeStats', 'empTopTenTable');
+        }
+
+        document.getElementById('empSectorCode').addEventListener('input', function() {
+            let code = this.value.trim();
+            let deptSelect = document.getElementById('empDeptSelect');
+            deptSelect.innerHTML = '<option value="عام">-- الإدارة العامة --</option>';
+            if(sectors[code] && sectors[code].departments) {
+                sectors[code].departments.forEach(d => { deptSelect.innerHTML += `<option value="${d}">${d}</option>`; });
+            }
+        });
+
+        function renderHonorBoardAndTopTen(sortedEmps, boardId, nameId, statsId, tableId) {
+            let board = document.getElementById(boardId);
+            if(sortedEmps.length > 0) {
+                board.classList.remove('hidden');
+                document.getElementById(nameId).textContent = `⭐ ${sortedEmps[0].name} ⭐`;
+                document.getElementById(statsId).textContent = `بإجمالي ${sortedEmps[0].count} مهمة`;
+            } else { board.classList.add('hidden'); }
+
+            let topTenTable = document.getElementById(tableId);
+            topTenTable.innerHTML = '';
+            sortedEmps.slice(0, 10).forEach((item, index) => {
+                topTenTable.innerHTML += `<tr><td>المركز ${index + 1}</td><td>${item.name}</td><td><b>${item.count}</b> مهمة</td></tr>`;
+            });
+        }
+
+        function saveAchievement() {
+            let taskName = document.getElementById('empTaskSelect').value;
+            let taskNum = document.getElementById('empTaskNumber').value.trim();
+            let taskContent = document.getElementById('empTaskContent').value.trim();
+            let date = document.getElementById('empAchieveDate').value;
+
+            if(!taskName || !taskNum || !taskContent || !date) return;
+            sectors[currentSectorCode].achievements.push({ empUser: currentEmpUser, taskName, taskNum, taskContent, date });
+            localStorage.setItem('sectors_db', JSON.stringify(sectors));
+            alert('تم حفظ الإنجاز بنجاح');
+            document.getElementById('empTaskNumber').value = '';
+            document.getElementById('empTaskContent').value = '';
+            loadEmpHistory();
+            updateEmpDashboardStats();
+        }
+
+        function isPastMonth(dateString) {
+            if (!dateString) return false;
+            let d = new Date(dateString), now = new Date();
+            return (d.getFullYear() < now.getFullYear() || (d.getFullYear() === now.getFullYear() && d.getMonth() < now.getMonth()));
+        }
+
+        function loadEmpHistory() {
+            let table = document.getElementById('empHistoryTable');
+            table.innerHTML = '';
+            let allAch = sectors[currentSectorCode].achievements;
+            let empAchIndices = [];
+            allAch.forEach((a, i) => { if(a.empUser === currentEmpUser) empAchIndices.push(i); });
+
+            if(empAchIndices.length === 0) { table.innerHTML = '<tr><td colspan="5" style="text-align:center;">لا توجد إنجازات</td></tr>'; return; }
+
+            empAchIndices.forEach(idx => {
+                let a = allAch[idx];
+                let isLocked = isPastMonth(a.date);
+                let actions = isLocked ? '<span class="locked-tag">🔒 مقفل</span>' : `<button class="btn btn-warning" onclick="openEditModal(${idx})">تعديل</button><button class="btn btn-danger" onclick="deleteEmpAchievement(${idx})">حذف</button>`;
+                table.innerHTML += `<tr><td>${a.date}</td><td><b>${a.taskName}</b></td><td>${a.taskNum}</td><td>${a.taskContent}</td><td>${actions}</td></tr>`;
+            });
+        }
+
+        function deleteEmpAchievement(idx) {
+            if (isPastMonth(sectors[currentSectorCode].achievements[idx].date)) return;
+            if (confirm('حذف الإنجاز؟')) {
+                sectors[currentSectorCode].achievements.splice(idx, 1);
+                localStorage.setItem('sectors_db', JSON.stringify(sectors));
+                loadEmpHistory();
+                updateEmpDashboardStats();
+            }
+        }
+
+        function openEditModal(idx) {
+            editingAchIndex = idx;
+            let ach = sectors[currentSectorCode].achievements[idx];
+            if (isPastMonth(ach.date)) return;
+            let select = document.getElementById('editTaskSelect');
+            select.innerHTML = '';
+            sectors[currentSectorCode].tasks.forEach(t => {
+                select.innerHTML += `<option value="${t}" ${t===ach.taskName?'selected':''}>${t}</option>`;
+            });
+            document.getElementById('editTaskNumber').value = ach.taskNum;
+            document.getElementById('editTaskContent').value = ach.taskContent;
+            document.getElementById('editAchieveDate').value = ach.date;
+            document.getElementById('editAchModal').classList.remove('hidden');
+        }
+
+        function closeEditModal() { document.getElementById('editAchModal').classList.add('hidden'); }
+
+        function saveEditedAchievement() {
+            if (editingAchIndex > -1) {
+                let ach = sectors[currentSectorCode].achievements[editingAchIndex];
+                ach.taskName = document.getElementById('editTaskSelect').value;
+                ach.taskNum = document.getElementById('editTaskNumber').value.trim();
+                ach.taskContent = document.getElementById('editTaskContent').value.trim();
+                ach.date = document.getElementById('editAchieveDate').value;
+                localStorage.setItem('sectors_db', JSON.stringify(sectors));
+                closeEditModal();
+                loadEmpHistory();
+                updateEmpDashboardStats();
+            }
+        }
+
+        function renderChart() {
+            let data = sectors[currentSectorCode];
+            let counts = {};
+            data.achievements.forEach(a => { counts[a.empUser] = (counts[a.empUser] || 0) + 1; });
+            let labels = Object.keys(counts), values = Object.values(counts);
+
+            let ctx = document.getElementById('adminChart').getContext('2d');
+            if(window.myAdminChart) window.myAdminChart.destroy();
+            window.myAdminChart = new Chart(ctx, {
+                data: {
+                    labels: labels.length > 0 ? labels : ['لا بيانات'],
+                    datasets: [
+                        { type: 'line', label: 'نقاط', data: values.length > 0 ? values : [0], borderColor: '#e53e3e', fill: false },
+                        { type: 'bar', label: 'مهام', data: values.length > 0 ? values : [0], backgroundColor: 'rgba(43, 108, 176, 0.75)' }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+            });
+        }
+    </script>
+</body>
+</html>
